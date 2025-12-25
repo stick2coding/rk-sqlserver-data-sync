@@ -1,0 +1,17 @@
+{
+  "name": "测试配置 - 单表测试",
+  "description": "用于测试同步功能，只包含一个表",
+  "tables": [
+    {
+      "table_name": "TEST_TABLE",
+      "schema": "dbo",
+      "sync_mode": "full",
+      "sync_strategy": "overwrite",
+      "primary_key": "id",
+      "enabled": false,
+      "sync_related_table": false,
+      "source_database": "testdb",
+      "target_database": "aws"
+    }
+  ]
+}
