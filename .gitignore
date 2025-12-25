@@ -40,9 +40,15 @@ logs/*.log
 .DS_Store
 Thumbs.db
 
-# Config files with sensitive data (keep templates)
-config/db_config.json.bak
-config/tables_config.json.bak
+# Config files with sensitive data
+config/db_config.json
+config/tables_config.json
+config/logging_config.json
+
+# Config templates (keep these)
+config/db_config.json.template
+config/tables_config.json.template
+config/logging_config.json.template
 
 # Temporary files
 *.tmp
