@@ -360,6 +360,7 @@ class DataSync:
             # 从源数据库查询WFC_PROCESS
             logger.info(f"从源数据库查询关联表: {source_related_db}.[{schema}].[{related_table}]")
             
+            
             # 切换数据库
             self.source_db.use_database(source_related_db)
             
@@ -386,8 +387,8 @@ class DataSync:
             existing_ids = self._get_existing_wfc_process_ids(related_table, schema)
             logger.info(f"目标表中已存在 {len(existing_ids)} 个WFC_PROCESS记录")
             
-            # 从源表查询需要同步的WFC_PROCESS数据
-            logger.info(f"从源表查询WFC_PROCESS数据...")
+            # 从源数据库查询需要同步的WFC_PROCESS数据
+            logger.info(f"从源数据库查询WFC_PROCESS数据...[{schema}].[{related_table}]")
             # 确保在源关联数据库中查询
             self.source_db.use_database(source_related_db)
             wfc_process_data = self._fetch_wfc_process_data(related_table, bindid_values, existing_ids, schema)

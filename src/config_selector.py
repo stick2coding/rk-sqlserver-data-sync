@@ -142,30 +142,122 @@ class ConfigSelector:
         Returns:
             Dict[str, str]: 选中的配置文件信息，如果退出则返回None
         """
+        import os
+        import sys
+        
+        # 首先尝试使用msvcrt (Windows原生支持)
+        if sys.platform == 'win32':
+            return self._handle_windows_input()
+        
+        # 非Windows系统尝试使用keyboard库
         try:
             import keyboard
+            return self._handle_keyboard_lib_input(keyboard)
         except ImportError:
-            print("错误: 无法导入keyboard库")
-            return None
+            print("\n提示: 未安装keyboard库，切换到数字选择模式")
+            return self._handle_numeric_input()
+    
+    def _handle_windows_input(self) -> Optional[Dict[str, str]]:
+        """Windows平台使用msvcrt处理输入（不需要管理员权限）
         
-        print("\n提示: 使用键盘上下键选择，按Enter确认，按Esc退出")
+        Returns:
+            Dict[str, str]: 选中的配置文件信息，如果退出则返回None
+        """
+        try:
+            import msvcrt
+        except ImportError:
+            print("\n提示: 无法使用msvcrt，切换到数字选择模式")
+            return self._handle_numeric_input()
+        
+        print("\n提示: 使用 ↑↓ 键选择，按 Enter 确认，按 Esc 退出")
+        print()
+        
+        # 首次显示菜单
+        self.display_menu()
         
         while True:
-            self.display_menu()
-            
+            # 检查是否有按键
+            if msvcrt.kbhit():
+                key = msvcrt.getch()
+                
+                # 处理特殊键
+                if key == b'\x00' or key == b'\xe0':  # 功能键前缀
+                    key = msvcrt.getch()
+                    
+                    if key == b'H':  # 上箭头
+                        self.current_index = (self.current_index - 1) % len(self.configs)
+                        self.display_menu()
+                    elif key == b'P':  # 下箭头
+                        self.current_index = (self.current_index + 1) % len(self.configs)
+                        self.display_menu()
+                    elif key == b'I':  # Page Up
+                        self.current_index = (self.current_index - 1) % len(self.configs)
+                        self.display_menu()
+                    elif key == b'Q':  # Page Down
+                        self.current_index = (self.current_index + 1) % len(self.configs)
+                        self.display_menu()
+                else:
+                    # 处理普通键
+                    if key in [b'\r', b'\n']:  # Enter键
+                        print(f"\n已选择: {self.configs[self.current_index]['name']}")
+                        return self.configs[self.current_index]
+                    elif key == b'\x1b':  # Esc键
+                        print("\n用户取消操作")
+                        return None
+                    elif key == b'\x03':  # Ctrl+C
+                        print("\n用户取消操作")
+                        return None
+                    elif key in [b'w', b'W']:  # W键
+                        self.current_index = (self.current_index - 1) % len(self.configs)
+                        self.display_menu()
+                    elif key in [b's', b'S']:  # S键
+                        self.current_index = (self.current_index + 1) % len(self.configs)
+                        self.display_menu()
+                    elif key in [b' ', b'\t']:  # 空格或Tab键
+                        print(f"\n已选择: {self.configs[self.current_index]['name']}")
+                        return self.configs[self.current_index]
+    
+    def _handle_keyboard_lib_input(self, keyboard) -> Optional[Dict[str, str]]:
+        """使用keyboard库处理输入（非Windows平台）
+        
+        Returns:
+            Dict[str, str]: 选中的配置文件信息，如果退出则返回None
+        """
+        print("\n提示: 使用键盘上下键选择，按Enter确认，按Esc或Ctrl+C退出")
+        
+        # 首次显示菜单
+        self.display_menu()
+        
+        # 记录上一次的索引，只在变化时重新渲染
+        last_index = self.current_index
+        
+        while True:
             # 等待按键
             key = keyboard.read_key(suppress=True)
             
-            if key == 'up':
+            # 支持多种键名变体
+            up_keys = ['up', 'up arrow', 'page up', 'w']
+            down_keys = ['down', 'down arrow', 'page down', 's']
+            enter_keys = ['enter', 'return', 'space']
+            exit_keys = ['esc', 'escape']
+            
+            if key in up_keys:
                 self.current_index = (self.current_index - 1) % len(self.configs)
-            elif key == 'down':
+            elif key in down_keys:
                 self.current_index = (self.current_index + 1) % len(self.configs)
-            elif key == 'enter':
+            elif key in enter_keys:
                 print(f"\n已选择: {self.configs[self.current_index]['name']}")
                 return self.configs[self.current_index]
-            elif key == 'esc' or (key == 'c' and keyboard.is_pressed('ctrl')):
+            elif key in exit_keys or (key == 'c' and keyboard.is_pressed('ctrl')):
                 print("\n用户取消操作")
                 return None
+            else:
+                continue
+            
+            # 只在索引变化时重新渲染菜单
+            if self.current_index != last_index:
+                self.display_menu()
+                last_index = self.current_index
     
     def _handle_numeric_input(self) -> Optional[Dict[str, str]]:
         """使用数字选择模式

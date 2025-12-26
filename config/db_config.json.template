@@ -1,0 +1,25 @@
+{
+  "source_database": {
+    "server": "your_source_server",
+    "database": "your_source_database",
+    "username": "your_username",
+    "password": "your_password",
+    "driver": "ODBC Driver 17 for SQL Server"
+  },
+  "target_database": {
+    "server": "your_target_server",
+    "database": "your_target_database",
+    "username": "your_username",
+    "password": "your_password",
+    "driver": "ODBC Driver 17 for SQL Server"
+  },
+  "sync_settings": {
+    "batch_size": 1000,
+    "retry_times": 3,
+    "retry_interval": 5
+  },
+  "related_table": {
+    "source_database": "awscrmdb",
+    "target_database": "aws"
+  }
+}
