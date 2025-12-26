@@ -1,0 +1,28 @@
+{
+  "name": "客户档案表同步",
+  "description": "同步客户档案相关表",
+  "tables": [
+    {
+      "table_name": "BO_EU_CUST_PROFILE",
+      "schema": "dbo",
+      "sync_mode": "full",
+      "sync_strategy": "overwrite",
+      "primary_key": "id",
+      "enabled": true,
+      "sync_related_table": true,
+      "source_database": "awscrmdb",
+      "target_database": "aws"
+    },
+    {
+      "table_name": "BO_EU_CUSTOMER_ALLOCATION",
+      "schema": "dbo",
+      "sync_mode": "full",
+      "sync_strategy": "overwrite",
+      "primary_key": "id",
+      "enabled": true,
+      "sync_related_table": true,
+      "source_database": "awscrmdb",
+      "target_database": "aws"
+    }
+  ]
+}

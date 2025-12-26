@@ -29,9 +29,12 @@ class DatabaseConnector:
         self.retry_times = retry_times
         self.retry_interval = retry_interval
         self._connection: Optional[pyodbc.Connection] = None
+        self._last_used = 0  # 记录连接最后使用时间
+        self._skip_connection_test = False  # 是否跳过连接测试（优化性能）
+        self._cursor: Optional[pyodbc.Cursor] = None  # 复用cursor对象（性能优化）
     
     def get_connection_string(self) -> str:
-        """构建连接字符串
+        """构建连接字符串（包含性能优化选项）
         
         Returns:
             str: ODBC连接字符串
@@ -43,21 +46,39 @@ class DatabaseConnector:
             f"UID={self.db_config['username']};"
             f"PWD={self.db_config['password']};"
             "TrustServerCertificate=yes;"
+            "Connection Timeout=30;"     # 连接超时30秒
+            "Query Timeout=300;"          # 查询超时5分钟
+            "MARS_Connection=yes;"        # 启用Multiple Active Result Sets
+            "ANSI_defaults=OFF;"        # 禁用ANSI默认值（提升性能）
+            "AutoTranslate=no;"          # 禁用自动字符集转换（提升性能）
+            "UseProcForPrepare=0;"      # 禁用存储过程准备（提升性能）
         )
     
-    def connect(self) -> pyodbc.Connection:
+    def connect(self, skip_test: bool = False) -> pyodbc.Connection:
         """建立数据库连接
         
+        Args:
+            skip_test: 是否跳过连接测试（用于性能优化）
+            
         Returns:
             pyodbc.Connection: 数据库连接对象
             
         Raises:
             Exception: 连接失败且重试次数用尽
         """
+        current_time = time.time()
+        
+        # 如果连接存在且未过期（30分钟内），直接复用
         if self._connection is not None:
+            # 如果跳过测试或者连接在30分钟内使用过，直接返回
+            if skip_test or (current_time - self._last_used < 1800):
+                self._last_used = current_time
+                return self._connection
+            
+            # 否则测试连接是否仍然有效
             try:
-                # 测试连接是否仍然有效
                 self._connection.execute("SELECT 1").fetchone()
+                self._last_used = current_time
                 return self._connection
             except Exception as e:
                 logger.warning(f"现有连接已失效，将重新连接: {e}")
@@ -70,6 +91,7 @@ class DatabaseConnector:
             try:
                 logger.info(f"尝试连接数据库 {self.db_config['database']} (第{attempt + 1}次)")
                 self._connection = pyodbc.connect(connection_string)
+                self._last_used = current_time
                 logger.info(f"成功连接到数据库: {self.db_config['server']}.{self.db_config['database']}")
                 return self._connection
                 
@@ -86,6 +108,14 @@ class DatabaseConnector:
     
     def close(self) -> None:
         """关闭数据库连接"""
+        if self._cursor is not None:
+            try:
+                self._cursor.close()
+            except Exception as e:
+                logger.debug(f"关闭cursor时发生错误: {e}")
+            finally:
+                self._cursor = None
+                
         if self._connection is not None:
             try:
                 self._connection.close()
@@ -94,9 +124,27 @@ class DatabaseConnector:
                 logger.error(f"关闭数据库连接时发生错误: {e}")
             finally:
                 self._connection = None
+                self._last_used = 0
+    
+    def _get_cursor(self) -> pyodbc.Cursor:
+        """获取或创建cursor（复用以提升性能）
+        
+        Returns:
+            pyodbc.Cursor: cursor对象
+        """
+        conn = self.connect(skip_test=True)
+        
+        # 复用cursor对象，避免每次查询都创建新cursor
+        if self._cursor is None:
+            self._cursor = conn.cursor()
+        elif self._cursor.connection is None:
+            # 如果cursor的连接已关闭，重新创建
+            self._cursor = conn.cursor()
+            
+        return self._cursor
     
     def execute_query(self, query: str, params: Optional[Tuple] = None) -> List[pyodbc.Row]:
-        """执行查询语句
+        """执行查询语句（优化性能：复用cursor、优化连接字符串）
         
         Args:
             query: SQL查询语句
@@ -105,24 +153,59 @@ class DatabaseConnector:
         Returns:
             List[pyodbc.Row]: 查询结果列表
         """
-        conn = self.connect()
-        cursor = conn.cursor()
+        start_time = time.time()
+        execute_time = 0
+        fetch_time = 0
+        
+        # 复用cursor对象
+        cursor = self._get_cursor()
+        
+        # 只在DEBUG级别输出SQL详细信息
+        if logger.isEnabledFor(logger.level) and logger.level <= 10:  # DEBUG level
+            if params and len(params) > 50:
+                logger.debug(f"执行查询，SQL长度: {len(query)}字符，参数数量: {len(params)}")
+            else:
+                logger.debug(f"执行查询: {query}，参数: {params}")
         
         try:
             if params:
+                exec_start = time.time()
                 cursor.execute(query, params)
+                execute_time = time.time() - exec_start
             else:
+                exec_start = time.time()
                 cursor.execute(query)
+                execute_time = time.time() - exec_start
             
+            # 优化：使用fetchall()，但记录执行和获取时间
+            fetch_start = time.time()
             results = cursor.fetchall()
+            fetch_time = time.time() - fetch_start
+            
+            elapsed_time = time.time() - start_time
+            
+            # 如果查询耗时超过1秒，记录警告和详细时间分解
+            if elapsed_time > 1.0:
+                logger.warning(f"查询耗时较长: {elapsed_time:.2f}秒 (执行: {execute_time:.2f}秒, 获取: {fetch_time:.2f}秒, 行数: {len(results)})")
+            
             return results
             
         except Exception as e:
-            logger.error(f"执行查询失败: {e}")
-            logger.error(f"查询语句: {query}")
+            elapsed_time = time.time() - start_time
+            logger.error(f"执行查询失败 (耗时: {elapsed_time:.2f}秒): {e}")
+            logger.error(f"查询语句: {query[:500]}...")  # 只输出SQL的前500个字符
+            if params:
+                logger.error(f"参数数量: {len(params)}")
+            
+            # 发生错误时重置cursor
+            try:
+                if self._cursor:
+                    self._cursor.close()
+                    self._cursor = None
+            except:
+                pass
+                
             raise
-        finally:
-            cursor.close()
     
     def execute_update(self, query: str, params: Optional[Tuple] = None) -> int:
         """执行更新/插入/删除语句
@@ -134,7 +217,7 @@ class DatabaseConnector:
         Returns:
             int: 受影响的行数
         """
-        conn = self.connect()
+        conn = self.connect(skip_test=True)
         cursor = conn.cursor()
         
         try:
@@ -166,7 +249,7 @@ class DatabaseConnector:
         Returns:
             int: 受影响的行数
         """
-        conn = self.connect()
+        conn = self.connect(skip_test=True)
         cursor = conn.cursor()
         
         try:
@@ -275,19 +358,19 @@ class DatabaseConnector:
     
     def begin_transaction(self) -> None:
         """开始事务"""
-        conn = self.connect()
+        conn = self.connect(skip_test=True)
         conn.autocommit = False
         logger.debug("事务已开始")
     
     def commit_transaction(self) -> None:
         """提交事务"""
-        conn = self.connect()
+        conn = self.connect(skip_test=True)
         conn.commit()
         logger.debug("事务已提交")
     
     def rollback_transaction(self) -> None:
         """回滚事务"""
-        conn = self.connect()
+        conn = self.connect(skip_test=True)
         conn.rollback()
         logger.warning("事务已回滚")
     
@@ -297,7 +380,7 @@ class DatabaseConnector:
         Args:
             database_name: 数据库名称
         """
-        conn = self.connect()
+        conn = self.connect(skip_test=True)
         try:
             conn.execute(f"USE [{database_name}]")
             logger.debug(f"已切换到数据库: {database_name}")

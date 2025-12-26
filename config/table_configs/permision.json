@@ -1,6 +1,6 @@
 {
-  "name": "权限表同步",
-  "description": "同步通用权限的四张表",
+  "name": "通用权限表同步",
+  "description": "同步通用授权功能中的四张表",
   "tables": [
     {
       "table_name": "BO_EU_BASIC_LOGIC_OBJECT",
