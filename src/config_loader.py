@@ -248,6 +248,17 @@ class ConfigLoader:
         if 'target_database' in table_config:
             if not table_config['target_database'] or not isinstance(table_config['target_database'], str):
                 raise ValueError(f"表配置[{index}].target_database必须是非空字符串")
+        
+        # 设置默认field_blacklist为空数组
+        if 'field_blacklist' not in table_config:
+            table_config['field_blacklist'] = []
+        elif not isinstance(table_config['field_blacklist'], list):
+            raise ValueError(f"表配置[{index}].field_blacklist必须是数组")
+        else:
+            # 验证数组中的每个元素都是字符串
+            for i, field in enumerate(table_config['field_blacklist']):
+                if not isinstance(field, str):
+                    raise ValueError(f"表配置[{index}].field_blacklist[{i}]必须是字符串")
     
     def get_source_database_config(self) -> Dict[str, str]:
         """获取源数据库配置

@@ -1,59 +1,60 @@
 {
-  "name": "客户档案及关联子表同步",
-  "description": "客户档案及关联子表同步",
+  "name": "系统相关表",
+  "description": "系统相关表",
   "tables": [
     {
-      "table_name": "BO_EU_CUST_PROFILE",
+      "table_name": "ORGUSER",
       "schema": "dbo",
       "sync_mode": "full",
       "sync_strategy": "overwrite",
       "primary_key": "id",
       "enabled": true,
-      "sync_related_table": true,
+      "sync_related_table": false,
+      "source_database": "awscrmdb",
+      "target_database": "aws",
+      "field_blacklist": ["EMAIL"]
+    },
+    {
+      "table_name": "ORGROLE",
+      "schema": "dbo",
+      "sync_mode": "full",
+      "sync_strategy": "overwrite",
+      "primary_key": "id",
+      "enabled": true,
+      "sync_related_table": false,
       "source_database": "awscrmdb",
       "target_database": "aws"
     },
     {
-      "table_name": "BO_EU_CUSTOMER_ALLOCATION",
+      "table_name": "ORGDEPARTMENT",
       "schema": "dbo",
       "sync_mode": "full",
       "sync_strategy": "overwrite",
       "primary_key": "id",
       "enabled": true,
-      "sync_related_table": true,
+      "sync_related_table": false,
       "source_database": "awscrmdb",
       "target_database": "aws"
     },
     {
-      "table_name": "BO_EU_CUSTOMER_BUSINESS",
+      "table_name": "ORGDEPARTMENTROLE",
       "schema": "dbo",
       "sync_mode": "full",
       "sync_strategy": "overwrite",
       "primary_key": "id",
       "enabled": true,
-      "sync_related_table": true,
+      "sync_related_table": false,
       "source_database": "awscrmdb",
       "target_database": "aws"
     },
     {
-      "table_name": "BO_EU_CUSTOMER_CONTACT",
+      "table_name": "ORGCOMPANY",
       "schema": "dbo",
       "sync_mode": "full",
       "sync_strategy": "overwrite",
       "primary_key": "id",
       "enabled": true,
-      "sync_related_table": true,
-      "source_database": "awscrmdb",
-      "target_database": "aws"
-    },
-    {
-      "table_name": "BO_EU_CUSTOMER_INVOICING",
-      "schema": "dbo",
-      "sync_mode": "full",
-      "sync_strategy": "overwrite",
-      "primary_key": "id",
-      "enabled": true,
-      "sync_related_table": true,
+      "sync_related_table": false,
       "source_database": "awscrmdb",
       "target_database": "aws"
     }

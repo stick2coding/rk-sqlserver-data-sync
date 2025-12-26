@@ -1,9 +1,20 @@
 {
-  "name": "默认配置 - 预测表同步",
-  "description": "同步预测相关的核心表，适合日常使用",
+  "name": "默认配置-用于测试",
+  "description": "测试程序效果",
   "tables": [
     {
       "table_name": "BO_EU_FCST_PERIOD",
+      "schema": "dbo",
+      "sync_mode": "full",
+      "sync_strategy": "overwrite",
+      "primary_key": "id",
+      "enabled": true,
+      "sync_related_table": true,
+      "source_database": "awscrmdb",
+      "target_database": "aws"
+    },
+    {
+      "table_name": "TEST",
       "schema": "dbo",
       "sync_mode": "full",
       "sync_strategy": "overwrite",

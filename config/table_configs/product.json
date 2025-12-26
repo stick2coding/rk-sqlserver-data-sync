@@ -1,9 +1,9 @@
 {
-  "name": "客户档案及关联子表同步",
-  "description": "客户档案及关联子表同步",
+  "name": "产品线相关及子表",
+  "description": "产品线相关及子表同步",
   "tables": [
     {
-      "table_name": "BO_EU_CUST_PROFILE",
+      "table_name": "BO_EU_PRODUCT_LINE",
       "schema": "dbo",
       "sync_mode": "full",
       "sync_strategy": "overwrite",
@@ -25,7 +25,7 @@
       "target_database": "aws"
     },
     {
-      "table_name": "BO_EU_CUSTOMER_BUSINESS",
+      "table_name": "BO_EU_PRODUCT_REL",
       "schema": "dbo",
       "sync_mode": "full",
       "sync_strategy": "overwrite",
@@ -36,7 +36,7 @@
       "target_database": "aws"
     },
     {
-      "table_name": "BO_EU_CUSTOMER_CONTACT",
+      "table_name": "BO_EU_CUST_PRODUCT_REL",
       "schema": "dbo",
       "sync_mode": "full",
       "sync_strategy": "overwrite",
@@ -47,7 +47,7 @@
       "target_database": "aws"
     },
     {
-      "table_name": "BO_EU_CUSTOMER_INVOICING",
+      "table_name": "BO_EU_PRODUCT_USER_REL",
       "schema": "dbo",
       "sync_mode": "full",
       "sync_strategy": "overwrite",

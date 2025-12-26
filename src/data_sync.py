@@ -89,6 +89,11 @@ class DataSync:
             source_columns = self.source_db.get_table_columns(table_name, schema)
             column_names = [col['name'] for col in source_columns]
             
+            # 获取字段黑名单
+            field_blacklist = table_config.get('field_blacklist', [])
+            if field_blacklist:
+                logger.info(f"字段黑名单: {field_blacklist}")
+            
             # 获取源表数据
             logger.info(f"获取表 [{table_source_db}].[{schema}].[{table_name}] 的数据...")
             source_data = self._fetch_table_data(
@@ -122,7 +127,7 @@ class DataSync:
                 logger.info(f"清空目标表: [{table_target_db}].[{schema}].[{table_name}]")
                 self.target_db.truncate_table(table_name, schema)
                 # 执行数据插入
-                self._insert_data(table_name, source_data, column_names, schema)
+                self._insert_data(table_name, source_data, column_names, schema, field_blacklist)
                 table_stats['synced_rows'] = len(source_data)
                 table_stats['inserted_rows'] = len(source_data)
                 table_stats['skipped_rows'] = 0
@@ -134,7 +139,8 @@ class DataSync:
                     source_data, 
                     column_names, 
                     primary_key,
-                    schema
+                    schema,
+                    field_blacklist
                 )
                 table_stats['synced_rows'] = len(source_data)
                 table_stats['inserted_rows'] = insert_stats.get('inserted', 0)
@@ -220,11 +226,53 @@ class DataSync:
         data = [tuple(row) for row in results]
         return data
     
+    def _apply_field_blacklist(self, 
+                            data: List[tuple], 
+                            column_names: List[str],
+                            field_blacklist: List[str]) -> List[tuple]:
+        """应用字段黑名单，将黑名单字段的值置为None
+        
+        Args:
+            data: 数据列表
+            column_names: 列名列表
+            field_blacklist: 字段黑名单列表
+            
+        Returns:
+            List[tuple]: 处理后的数据列表
+        """
+        if not field_blacklist:
+            return data
+        
+        # 创建黑名单字段的索引集合（大小写不敏感）
+        blacklist_upper = [field.upper() for field in field_blacklist]
+        blacklist_indices = set()
+        
+        for i, col_name in enumerate(column_names):
+            if col_name.upper() in blacklist_upper:
+                blacklist_indices.add(i)
+        
+        if not blacklist_indices:
+            logger.debug("没有需要处理的黑名单字段")
+            return data
+        
+        logger.info(f"应用字段黑名单，黑名单字段索引: {blacklist_indices}")
+        
+        # 将黑名单字段的值置为None
+        processed_data = []
+        for row in data:
+            processed_row = list(row)
+            for index in blacklist_indices:
+                processed_row[index] = None
+            processed_data.append(tuple(processed_row))
+        
+        return processed_data
+    
     def _insert_data(self, 
                     table_name: str, 
                     data: List[tuple], 
                     column_names: List[str],
-                    schema: str = 'dbo') -> None:
+                    schema: str = 'dbo',
+                    field_blacklist: List[str] = None) -> None:
         """批量插入数据到目标表
         
         Args:
@@ -232,9 +280,14 @@ class DataSync:
             data: 数据列表
             column_names: 列名列表
             schema: 架构名（默认为dbo）
+            field_blacklist: 字段黑名单列表
         """
         if not data:
             return
+        
+        # 应用字段黑名单
+        if field_blacklist:
+            data = self._apply_field_blacklist(data, column_names, field_blacklist)
         
         # 构建插入SQL
         columns_str = ', '.join([f'[{col}]' for col in column_names])
@@ -264,7 +317,8 @@ class DataSync:
                                   data: List[tuple], 
                                   column_names: List[str],
                                   primary_key: str,
-                                  schema: str = 'dbo') -> Dict[str, int]:
+                                  schema: str = 'dbo',
+                                  field_blacklist: List[str] = None) -> Dict[str, int]:
         """使用临时表模式插入数据到目标表（append模式专用）
         
         步骤：
@@ -280,12 +334,17 @@ class DataSync:
             column_names: 列名列表
             primary_key: 主键列名
             schema: 架构名（默认为dbo）
+            field_blacklist: 字段黑名单列表
             
         Returns:
             Dict[str, int]: 统计信息 {'inserted': 成功插入数, 'skipped': 跳过数}
         """
         if not data:
             return {'inserted': 0, 'skipped': 0, 'error': 0}
+        
+        # 应用字段黑名单
+        if field_blacklist:
+            data = self._apply_field_blacklist(data, column_names, field_blacklist)
         
         import time
         start_time = time.time()
@@ -384,7 +443,8 @@ class DataSync:
                        table_name: str, 
                        data: List[tuple], 
                        column_names: List[str],
-                       schema: str = 'dbo') -> Dict[str, int]:
+                       schema: str = 'dbo',
+                       field_blacklist: List[str] = None) -> Dict[str, int]:
         """安全插入数据到目标表（避免主键冲突，使用分批执行提升性能）
         
         使用分批插入并捕获主键冲突异常，确保不会因为主键重复而中断
@@ -394,12 +454,17 @@ class DataSync:
             data: 数据列表
             column_names: 列名列表
             schema: 架构名（默认为dbo）
+            field_blacklist: 字段黑名单列表
             
         Returns:
             Dict[str, int]: 统计信息 {'inserted': 成功插入数, 'skipped': 跳过数}
         """
         if not data:
             return {'inserted': 0, 'skipped': 0, 'error': 0}
+        
+        # 应用字段黑名单
+        if field_blacklist:
+            data = self._apply_field_blacklist(data, column_names, field_blacklist)
         
         # 构建插入SQL
         columns_str = ', '.join([f'[{col}]' for col in column_names])
