@@ -1,0 +1,17 @@
+{
+  "name": "通用导入数据",
+  "description": "通用导入数据",
+  "tables": [
+    {
+      "table_name": "BO_EU_GENERAL_IMPORT_CONFIG",
+      "schema": "dbo",
+      "sync_mode": "full",
+      "sync_strategy": "overwrite",
+      "primary_key": "id",
+      "enabled": true,
+      "sync_related_table": true,
+      "source_database": "awscrmdb",
+      "target_database": "aws"
+    }
+  ]
+}

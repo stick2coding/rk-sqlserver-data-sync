@@ -1,0 +1,50 @@
+{
+  "name": "客户拜访报告",
+  "description": "客户拜访报告表同步",
+  "tables": [
+    {
+      "table_name": "BO_EU_VISIT_REPORT",
+      "schema": "dbo",
+      "sync_mode": "full",
+      "sync_strategy": "overwrite",
+      "primary_key": "id",
+      "enabled": true,
+      "sync_related_table": true,
+      "source_database": "awscrmdb",
+      "target_database": "aws"
+    },
+    {
+      "table_name": "BO_EU_VISIT_PROJECT_REL",
+      "schema": "dbo",
+      "sync_mode": "full",
+      "sync_strategy": "overwrite",
+      "primary_key": "id",
+      "enabled": true,
+      "sync_related_table": true,
+      "source_database": "awscrmdb",
+      "target_database": "aws"
+    },
+    {
+      "table_name": "BO_EU_VISIT_PROJECT_REL",
+      "schema": "dbo",
+      "sync_mode": "full",
+      "sync_strategy": "overwrite",
+      "primary_key": "id",
+      "enabled": true,
+      "sync_related_table": true,
+      "source_database": "awscrmdb",
+      "target_database": "aws"
+    },
+    {
+      "table_name": "BO_EU_VISIT_MEETING_MEMBER",
+      "schema": "dbo",
+      "sync_mode": "full",
+      "sync_strategy": "overwrite",
+      "primary_key": "id",
+      "enabled": true,
+      "sync_related_table": true,
+      "source_database": "awscrmdb",
+      "target_database": "aws"
+    }
+  ]
+}

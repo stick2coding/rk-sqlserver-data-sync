@@ -229,8 +229,8 @@ class DataSync:
     def _apply_field_blacklist(self, 
                             data: List[tuple], 
                             column_names: List[str],
-                            field_blacklist: List[str]) -> List[tuple]:
-        """应用字段黑名单，将黑名单字段的值置为None
+                            field_blacklist: List[str]) -> tuple:
+        """应用字段黑名单，从列名和数据中移除黑名单字段
         
         Args:
             data: 数据列表
@@ -238,10 +238,10 @@ class DataSync:
             field_blacklist: 字段黑名单列表
             
         Returns:
-            List[tuple]: 处理后的数据列表
+            tuple: (过滤后的数据列表, 过滤后的列名列表)
         """
         if not field_blacklist:
-            return data
+            return data, column_names
         
         # 创建黑名单字段的索引集合（大小写不敏感）
         blacklist_upper = [field.upper() for field in field_blacklist]
@@ -253,19 +253,21 @@ class DataSync:
         
         if not blacklist_indices:
             logger.debug("没有需要处理的黑名单字段")
-            return data
+            return data, column_names
         
-        logger.info(f"应用字段黑名单，黑名单字段索引: {blacklist_indices}")
+        logger.info(f"应用字段黑名单，移除字段索引: {blacklist_indices}")
         
-        # 将黑名单字段的值置为None
+        # 构建过滤后的列名列表
+        filtered_column_names = [col for i, col in enumerate(column_names) if i not in blacklist_indices]
+        logger.info(f"过滤后的列名: {filtered_column_names}")
+        
+        # 从数据中移除黑名单字段的值
         processed_data = []
         for row in data:
-            processed_row = list(row)
-            for index in blacklist_indices:
-                processed_row[index] = None
+            processed_row = [val for i, val in enumerate(row) if i not in blacklist_indices]
             processed_data.append(tuple(processed_row))
         
-        return processed_data
+        return processed_data, filtered_column_names
     
     def _insert_data(self, 
                     table_name: str, 
@@ -285,11 +287,11 @@ class DataSync:
         if not data:
             return
         
-        # 应用字段黑名单
+        # 应用字段黑名单，返回过滤后的数据和列名
         if field_blacklist:
-            data = self._apply_field_blacklist(data, column_names, field_blacklist)
+            data, column_names = self._apply_field_blacklist(data, column_names, field_blacklist)
         
-        # 构建插入SQL
+        # 构建插入SQL（使用过滤后的列名）
         columns_str = ', '.join([f'[{col}]' for col in column_names])
         placeholders = ', '.join(['?' for _ in column_names])
         full_table_name = f"[{schema}].[{table_name}]"
@@ -342,9 +344,9 @@ class DataSync:
         if not data:
             return {'inserted': 0, 'skipped': 0, 'error': 0}
         
-        # 应用字段黑名单
+        # 应用字段黑名单，返回过滤后的数据和列名
         if field_blacklist:
-            data = self._apply_field_blacklist(data, column_names, field_blacklist)
+            data, column_names = self._apply_field_blacklist(data, column_names, field_blacklist)
         
         import time
         start_time = time.time()
@@ -462,11 +464,11 @@ class DataSync:
         if not data:
             return {'inserted': 0, 'skipped': 0, 'error': 0}
         
-        # 应用字段黑名单
+        # 应用字段黑名单，返回过滤后的数据和列名
         if field_blacklist:
-            data = self._apply_field_blacklist(data, column_names, field_blacklist)
+            data, column_names = self._apply_field_blacklist(data, column_names, field_blacklist)
         
-        # 构建插入SQL
+        # 构建插入SQL（使用过滤后的列名）
         columns_str = ', '.join([f'[{col}]' for col in column_names])
         placeholders = ', '.join(['?' for _ in column_names])
         full_table_name = f"[{schema}].[{table_name}]"
