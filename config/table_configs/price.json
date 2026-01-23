@@ -1,0 +1,50 @@
+{
+  "name": "价格",
+  "description": "价格",
+  "tables": [
+    {
+      "table_name": "BO_EU_SPECIAL_PRICE_PROCESS",
+      "schema": "dbo",
+      "sync_mode": "full",
+      "sync_strategy": "overwrite",
+      "primary_key": "id",
+      "enabled": true,
+      "sync_related_table": true,
+      "source_database": "awscrmdb",
+      "target_database": "aws"
+    },
+    {
+      "table_name": "BO_EU_SPECIAL_NEST_PROCESS",
+      "schema": "dbo",
+      "sync_mode": "full",
+      "sync_strategy": "overwrite",
+      "primary_key": "id",
+      "enabled": true,
+      "sync_related_table": true,
+      "source_database": "awscrmdb",
+      "target_database": "aws"
+    },
+    {
+      "table_name": "BO_EU_EXCHANGE_RATE",
+      "schema": "dbo",
+      "sync_mode": "full",
+      "sync_strategy": "overwrite",
+      "primary_key": "id",
+      "enabled": true,
+      "sync_related_table": true,
+      "source_database": "awscrmdb",
+      "target_database": "aws"
+    },
+    {
+      "table_name": "BO_EU_SPLIT_PRICE",
+      "schema": "dbo",
+      "sync_mode": "full",
+      "sync_strategy": "overwrite",
+      "primary_key": "id",
+      "enabled": true,
+      "sync_related_table": true,
+      "source_database": "awscrmdb",
+      "target_database": "aws"
+    }
+  ]
+}

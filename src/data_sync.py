@@ -156,7 +156,8 @@ class DataSync:
             # 检查是否需要同步关联表WFC_PROCESS
             if table_config.get('sync_related_table', False) and 'BINDID' in column_names:
                 logger.info(f"检测到BINDID字段，准备同步关联表WFC_PROCESS")
-                related_stats = self._sync_related_wfc_process(table_name, schema, source_data, column_names)
+                # 传入 table_config 以便获取源表数据库信息
+                related_stats = self._sync_related_wfc_process(table_name, schema, source_data, column_names, table_config)
                 table_stats['related_synced_rows'] = related_stats.get('total', 0)
                 table_stats['related_existing_count'] = related_stats.get('existing', 0)
                 table_stats['related_inserted_count'] = related_stats.get('inserted', 0)
@@ -181,7 +182,7 @@ class DataSync:
         Args:
             table_name: 表名
             column_names: 列名列表
-            sync_mode: 同步模式（full/incremental）
+            sync_mode: 同步模式
             table_config: 表配置
             schema: 架构名（默认为dbo）
             
@@ -189,7 +190,7 @@ class DataSync:
             List[tuple]: 数据行列表
         """
         # 构建列名字符串，对列名加方括号防止SQL注入
-        columns_str = ', '.join([f'[{col}]' for col in column_names])
+        columns_str = ', '.join([f"[{col}]" for col in column_names])
         full_table_name = f"[{schema}].[{table_name}]"
         
         if sync_mode == 'full':
@@ -292,7 +293,7 @@ class DataSync:
             data, column_names = self._apply_field_blacklist(data, column_names, field_blacklist)
         
         # 构建插入SQL（使用过滤后的列名）
-        columns_str = ', '.join([f'[{col}]' for col in column_names])
+        columns_str = ', '.join([f"[{col}]" for col in column_names])
         placeholders = ', '.join(['?' for _ in column_names])
         full_table_name = f"[{schema}].[{table_name}]"
         insert_sql = f"INSERT INTO {full_table_name} ({columns_str}) VALUES ({placeholders})"
@@ -409,7 +410,7 @@ class DataSync:
             
             # 5. 插入过滤后的数据
             if filtered_data:
-                columns_str = ', '.join([f'[{col}]' for col in column_names])
+                columns_str = ', '.join([f"[{col}]" for col in column_names])
                 placeholders = ', '.join(['?' for _ in column_names])
                 insert_sql = f"INSERT INTO {full_table_name} ({columns_str}) VALUES ({placeholders})"
                 
@@ -469,7 +470,7 @@ class DataSync:
             data, column_names = self._apply_field_blacklist(data, column_names, field_blacklist)
         
         # 构建插入SQL（使用过滤后的列名）
-        columns_str = ', '.join([f'[{col}]' for col in column_names])
+        columns_str = ', '.join([f"[{col}]" for col in column_names])
         placeholders = ', '.join(['?' for _ in column_names])
         full_table_name = f"[{schema}].[{table_name}]"
         insert_sql = f"INSERT INTO {full_table_name} ({columns_str}) VALUES ({placeholders})"
@@ -556,7 +557,8 @@ class DataSync:
                                   source_table_name: str,
                                   source_table_schema: str,
                                   table_data: List[tuple], 
-                                  column_names: List[str]) -> Dict[str, int]:
+                                  column_names: List[str],
+                                  table_config: Dict[str, Any]) -> Dict[str, int]:
         """同步关联表WFC_PROCESS的数据（使用关联子查询，避免手动收集BINDID）
         
         Args:
@@ -564,6 +566,7 @@ class DataSync:
             source_table_schema: 原始表的schema
             table_data: 已同步的表数据
             column_names: 列名列表
+            table_config: 表配置（包含源数据库信息）
             
         Returns:
             Dict[str, int]: 统计信息 {
@@ -579,12 +582,20 @@ class DataSync:
                 logger.warning("未找到BINDID字段，跳过关联表同步")
                 return {'total': 0, 'inserted': 0, 'skipped': 0, 'existing': 0, 'error': 0}
             
-            # 检查WFC_PROCESS表是否存在
+            # 获取源表数据库信息
+            # 如果表配置中有指定源数据库，则使用配置的；否则使用默认源数据库
+            source_table_db = table_config.get('source_database', self.source_db.db_config['database'])
+            
+            # 获取WFC_PROCESS表所在的目标关联数据库
             related_table = "WFC_PROCESS"
             # WFC_PROCESS使用与原始表相同的schema
             related_schema = source_table_schema
             
-            # 切换到源关联数据库
+            # 切换到源关联数据库（WFC_PROCESS所在的数据库）
+            # 注意：这里需要查询WFC_PROCESS，所以我们要切换到WFC_PROCESS所在的数据库
+            # WFC_PROCESS通常在awscrmdb中，但我们需要确认
+            # 如果related_table_config指定了source_database，则使用它；否则使用默认的source_db
+            
             source_related_db = self.related_table_config.get('source_database', self.source_db.db_config['database'])
             logger.info(f"切换到源关联数据库: {source_related_db}")
             self.source_db.use_database(source_related_db)
@@ -615,6 +626,7 @@ class DataSync:
                 related_table,
                 source_table_name,
                 source_table_schema,
+                source_table_db,  # 传入源表数据库，用于跨库查询
                 existing_ids,
                 related_schema
             )
@@ -749,6 +761,7 @@ class DataSync:
                                table_name: str, 
                                source_table_name: str,
                                source_table_schema: str,
+                               source_table_database: str,
                                existing_ids: set,
                                schema: str = 'dbo') -> List[tuple]:
         """从源表获取WFC_PROCESS数据（使用关联子查询，避免手动收集BINDID）
@@ -757,6 +770,7 @@ class DataSync:
             table_name: WFC_PROCESS表名
             source_table_name: 原始表名（包含BINDID的表）
             source_table_schema: 原始表的schema
+            source_table_database: 原始表的数据库
             existing_ids: 目标表中已存在的ID集合
             schema: WFC_PROCESS表的架构名（默认为dbo）
             
@@ -766,11 +780,19 @@ class DataSync:
         # 获取WFC_PROCESS表的列信息
         columns = self.source_db.get_table_columns(table_name, schema)
         column_names = [col['name'] for col in columns]
-        columns_str = ', '.join([f'[{col}]' for col in column_names])
+        columns_str = ', '.join([f"[{col}]" for col in column_names])
         
         # 构建完整表名
         wfc_full_table = f"[{schema}].[{table_name}]"
-        source_full_table = f"[{source_table_schema}].[{source_table_name}]"
+        
+        # 构建源表的完整表名
+        # 如果源表数据库与当前数据库不同，则使用三部分命名 [DB].[Schema].[Table]
+        # 这样可以支持跨数据库查询
+        if source_table_database and source_table_database != self.source_db.db_config['database']:
+            source_full_table = f"[{source_table_database}].[{source_table_schema}].[{source_table_name}]"
+            logger.debug(f"源表在不同的数据库中，使用三部分命名: {source_full_table}")
+        else:
+            source_full_table = f"[{source_table_schema}].[{source_table_name}]"
         
         # 找到ID列的索引
         id_index = None
